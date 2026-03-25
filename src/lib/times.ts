@@ -133,12 +133,13 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 function getPool(difficulty: Difficulty): ClockTime[] {
+  const minH = difficulty === 'aloittelija' ? 1 : 0;
   const maxH = difficulty === 'aloittelija' ? 12 : 23;
   const mins = (difficulty === 'aloittelija' || difficulty === 'oppilas')
     ? [0, 15, 30, 45]
     : [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
   const pool: ClockTime[] = [];
-  for (let h = 1; h <= maxH; h++)
+  for (let h = minH; h <= maxH; h++)
     for (const m of mins)
       pool.push({ hours: h, minutes: m });
   return pool;
@@ -181,7 +182,7 @@ function clockToMin(t: ClockTime): number {
 }
 
 function generateDifference(pool: ClockTime[]): DifferenceExercise {
-  const p = pool.filter(t => t.hours >= 1 && t.hours <= 23);
+  const p = pool.filter(t => t.hours <= 23);
   let time1!: ClockTime, time2!: ClockTime, diff = 0;
   for (let att = 0; att < 200; att++) {
     const [a, b] = shuffle(p).slice(0, 2);
@@ -207,14 +208,14 @@ function generateDifference(pool: ClockTime[]): DifferenceExercise {
 }
 
 function generateAddition(pool: ClockTime[]): AdditionExercise {
-  const p = pool.filter(t => t.hours >= 1 && t.hours <= 23);
+  const p = pool.filter(t => t.hours <= 23);
   const deltas = [-60, -45, -30, -25, -20, -15, 15, 20, 25, 30, 45, 60];
   let time!: ClockTime, delta!: number, correct!: ClockTime;
   for (let att = 0; att < 200; att++) {
     const t = p[Math.floor(Math.random() * p.length)];
     const d = deltas[Math.floor(Math.random() * deltas.length)];
     const total = clockToMin(t) + d;
-    if (total >= 60 && total < 1440) {
+    if (total >= 0 && total < 1440) {
       time = t;
       delta = d;
       correct = { hours: Math.floor(total / 60), minutes: total % 60 };
@@ -225,7 +226,7 @@ function generateAddition(pool: ClockTime[]): AdditionExercise {
   const offsets = shuffle([-30, -25, -20, -15, -10, -5, 5, 10, 15, 20, 25, 30]);
   for (const off of offsets) {
     const total = clockToMin(correct) + off;
-    if (total >= 60 && total < 1440) {
+    if (total >= 0 && total < 1440) {
       const candidate = { hours: Math.floor(total / 60), minutes: total % 60 };
       if (!timesEqual(candidate, correct) && !wrong.some(w => timesEqual(w, candidate))) {
         wrong.push(candidate);
