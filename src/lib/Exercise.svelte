@@ -91,8 +91,8 @@
   {:else}
     <!-- addition -->
     <div class="digital-display">{toDigital(exercise.time)}</div>
-    <div class="delta-badge" class:add={exercise.delta > 0} class:sub={exercise.delta < 0}>
-      {exercise.delta > 0 ? '+' : ''}{formatDuration(Math.abs(exercise.delta))}
+    <div class="delta-badge">
+      {exercise.delta > 0 ? 'lisää' : 'vähennä'} {formatDuration(Math.abs(exercise.delta))}
     </div>
   {/if}
 
@@ -197,9 +197,9 @@
     padding: 8px 20px;
     border-radius: 16px;
     letter-spacing: 1px;
+    background: #fff3e0;
+    color: #e65100;
   }
-  .delta-badge.add { background: #e8f5e9; color: #2e7d32; }
-  .delta-badge.sub { background: #fce4ec; color: #c62828; }
 
   /* Choices */
   .choices-grid {
