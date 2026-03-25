@@ -32,12 +32,34 @@ export interface AdditionExercise {
   correctIndex: number;
 }
 
-export interface MestariExercise {
+export interface MestariConversionExercise {
   type: 'mestari';
+  variant: 'conversion';
   targetTime: ClockTime;
   targetFormat: Format;
   answerFormat: Format;
 }
+
+export interface MestariDifferenceExercise {
+  type: 'mestari';
+  variant: 'difference';
+  time1: ClockTime;
+  time2: ClockTime;
+  correctMinutes: number;
+}
+
+export interface MestariAdditionExercise {
+  type: 'mestari';
+  variant: 'addition';
+  baseTime: ClockTime;
+  delta: number;
+  answerFormat: Format;
+}
+
+export type MestariExercise =
+  | MestariConversionExercise
+  | MestariDifferenceExercise
+  | MestariAdditionExercise;
 
 export type Exercise =
   | ConversionExercise
@@ -225,11 +247,23 @@ export function generateExercises(difficulty: Difficulty, count = 10): Exercise[
 
   if (difficulty === 'mestari') {
     const allFormats: Format[] = ['analog', 'digital', 'text'];
-    return shuffle(pool).slice(0, count).map(time => {
+    return Array.from({ length: count }, () => {
+      const r = Math.random();
+      if (r < 0.25) {
+        const d = generateDifference(pool);
+        const correctMinutes = d.choices[d.correctIndex];
+        return { type: 'mestari', variant: 'difference', time1: d.time1, time2: d.time2, correctMinutes } satisfies MestariDifferenceExercise;
+      }
+      if (r < 0.5) {
+        const a = generateAddition(pool);
+        const answerFormat = allFormats[Math.floor(Math.random() * 3)];
+        return { type: 'mestari', variant: 'addition', baseTime: a.time, delta: a.delta, answerFormat } satisfies MestariAdditionExercise;
+      }
+      const time = pool[Math.floor(Math.random() * pool.length)];
       const targetFormat = allFormats[Math.floor(Math.random() * 3)];
       const rest = allFormats.filter(f => f !== targetFormat);
       const answerFormat = rest[Math.floor(Math.random() * rest.length)];
-      return { type: 'mestari', targetTime: time, targetFormat, answerFormat } satisfies MestariExercise;
+      return { type: 'mestari', variant: 'conversion', targetTime: time, targetFormat, answerFormat } satisfies MestariConversionExercise;
     });
   }
 

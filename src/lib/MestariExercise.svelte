@@ -1,6 +1,6 @@
 <script lang="ts">
   import AnalogClock from './AnalogClock.svelte';
-  import { toText, toDigital, type MestariExercise } from './times.js';
+  import { toText, toDigital, formatDuration, type MestariExercise, type Format } from './times.js';
 
   interface Props {
     exercise: MestariExercise;
@@ -9,42 +9,60 @@
   }
   let { exercise, onAnswer, onNext }: Props = $props();
 
-  // Analog and text both use 12h form – allow either 12h or 24h interpretation.
-  const uses12h = (f: typeof exercise.answerFormat) => f === 'analog' || f === 'text';
-  const maxHours = uses12h(exercise.answerFormat) ? 12 : 24;
-
-  // Start away from the answer so the player has to actively adjust.
-  const startH = (exercise.targetTime.hours % 12 || 12) === 12 ? 6 : 12;
-  let curH = $state(startH);
-  let curM = $state(0);
-
+  // ── Common state ───────────────────────────────────────────
   type AnswerState = 'waiting' | 'correct' | 'wrong';
   let answerState = $state<AnswerState>('waiting');
-
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
   $effect(() => () => { if (timeoutId) clearTimeout(timeoutId); });
 
-  function adjH(d: number) {
-    if (answerState !== 'waiting') return;
-    curH = ((curH - 1 + d + maxHours) % maxHours) + 1;
-  }
-  function adjM(d: number) {
-    if (answerState !== 'waiting') return;
-    curM = ((curM + d) + 60) % 60;
-  }
+  // ── Time adjuster (conversion + addition) ──────────────────
+  const answerFmt: Format = exercise.variant === 'difference' ? 'digital' : exercise.answerFormat;
+  const uses12h = (f: Format) => f === 'analog' || f === 'text';
+  const maxH = uses12h(answerFmt) ? 12 : 24;
 
-  function isCorrect(): boolean {
-    if (curM !== exercise.targetTime.minutes) return false;
-    // If either format is 12h-based (analog or text), accept both 12h interpretations.
+  // Start away from the correct answer
+  const correctH12 = (() => {
+    if (exercise.variant === 'conversion') return exercise.targetTime.hours % 12 || 12;
+    if (exercise.variant === 'addition') {
+      const t = exercise.baseTime.hours * 60 + exercise.baseTime.minutes + exercise.delta;
+      return Math.floor(t / 60) % 12 || 12;
+    }
+    return 1;
+  })();
+  let curH = $state(correctH12 === 12 ? 6 : 12);
+  let curM = $state(0);
+
+  // ── Duration adjuster (difference) ────────────────────────
+  let curDH = $state(0);   // 0–3
+  let curDM = $state(0);   // 0, 5, …, 55
+
+  // ── Adjust functions ───────────────────────────────────────
+  function adjH(d: number)  { if (answerState !== 'waiting') return; curH = ((curH - 1 + d + maxH) % maxH) + 1; }
+  function adjM(d: number)  { if (answerState !== 'waiting') return; curM = ((curM + d) + 60) % 60; }
+  function adjDH(d: number) { if (answerState !== 'waiting') return; curDH = ((curDH + d) + 4) % 4; }
+  function adjDM(d: number) { if (answerState !== 'waiting') return; curDM = ((curDM + d) + 60) % 60; }
+
+  // ── Correctness ────────────────────────────────────────────
+  function checkCorrect(): boolean {
+    if (exercise.variant === 'difference') {
+      return curDH * 60 + curDM === exercise.correctMinutes;
+    }
+    const targetTime = exercise.variant === 'conversion'
+      ? exercise.targetTime
+      : (() => {
+          const t = exercise.baseTime.hours * 60 + exercise.baseTime.minutes + exercise.delta;
+          return { hours: Math.floor(t / 60), minutes: t % 60 };
+        })();
+    if (curM !== targetTime.minutes) return false;
     const h12 = (h: number) => h % 12 || 12;
-    if (uses12h(exercise.targetFormat) || uses12h(exercise.answerFormat))
-      return h12(curH) === h12(exercise.targetTime.hours);
-    return curH === exercise.targetTime.hours;
+    const tFmt: Format = exercise.variant === 'conversion' ? exercise.targetFormat : 'digital';
+    if (uses12h(tFmt) || uses12h(answerFmt)) return h12(curH) === h12(targetTime.hours);
+    return curH === targetTime.hours;
   }
 
   function submit() {
     if (answerState !== 'waiting') return;
-    const ok = isCorrect();
+    const ok = checkCorrect();
     onAnswer(ok);
     answerState = ok ? 'correct' : 'wrong';
     if (ok) timeoutId = setTimeout(onNext, 1600);
@@ -58,48 +76,89 @@
   ];
 
   const dvh = typeof window !== 'undefined' ? window.innerHeight : 700;
-  const clockSize = Math.min(140, Math.max(100, Math.round(dvh * 0.17)));
+  const clockSize       = Math.min(140, Math.max(100, Math.round(dvh * 0.17)));
+  const targetClockSize = Math.min(200, Math.max(140, Math.round(dvh * 0.24)));
 </script>
 
-<!-- Target -->
+<!-- ── Question card ──────────────────────────────────────── -->
 <div class="target-card">
-  <p class="target-label">Aseta kello osoittamaan:</p>
-  {#if exercise.targetFormat === 'analog'}
-    <AnalogClock hours={exercise.targetTime.hours} minutes={exercise.targetTime.minutes} size={Math.min(200, Math.max(140, Math.round(dvh * 0.24)))} />
-  {:else if exercise.targetFormat === 'digital'}
-    <div class="target-digital">{toDigital(exercise.targetTime)}</div>
+  {#if exercise.variant === 'difference'}
+    <p class="target-label">Kuinka pitkä aika kului?</p>
+    <div class="two-times">
+      <div class="time-item">
+        <div class="time-small-label">Alku</div>
+        <div class="target-digital small">{toDigital(exercise.time1)}</div>
+      </div>
+      <div class="time-arrow">→</div>
+      <div class="time-item">
+        <div class="time-small-label">Loppu</div>
+        <div class="target-digital small">{toDigital(exercise.time2)}</div>
+      </div>
+    </div>
+
+  {:else if exercise.variant === 'addition'}
+    <p class="target-label">Mitä kello on nyt?</p>
+    <div class="target-digital">{toDigital(exercise.baseTime)}</div>
+    <div class="delta-badge">
+      {exercise.delta > 0 ? 'lisää' : 'vähennä'} {formatDuration(Math.abs(exercise.delta))}
+    </div>
+
   {:else}
-    <div class="target-text">{toText(exercise.targetTime)}</div>
+    <p class="target-label">Aseta kello osoittamaan:</p>
+    {#if exercise.targetFormat === 'analog'}
+      <AnalogClock hours={exercise.targetTime.hours} minutes={exercise.targetTime.minutes} size={targetClockSize} />
+    {:else if exercise.targetFormat === 'digital'}
+      <div class="target-digital">{toDigital(exercise.targetTime)}</div>
+    {:else}
+      <div class="target-text">{toText(exercise.targetTime)}</div>
+    {/if}
   {/if}
 </div>
 
-<!-- Adjustable display -->
+<!-- ── Adjuster ────────────────────────────────────────────── -->
 <div class="adjuster">
-  <div class="adj-col">
-    <button class="adj-btn" onclick={() => adjH(1)} disabled={answerState !== 'waiting'}>▲</button>
-    <div class="adj-label">Tunnit</div>
-    <button class="adj-btn" onclick={() => adjH(-1)} disabled={answerState !== 'waiting'}>▼</button>
-  </div>
-
-  <div class="clock-display">
-    {#if exercise.answerFormat === 'analog'}
-      <AnalogClock hours={curH} minutes={curM} size={clockSize} />
-    {:else if exercise.answerFormat === 'digital'}
+  {#if exercise.variant === 'difference'}
+    <div class="adj-col">
+      <button class="adj-btn" onclick={() => adjDH(1)}  disabled={answerState !== 'waiting'}>▲</button>
+      <div class="adj-label">Tunnit</div>
+      <button class="adj-btn" onclick={() => adjDH(-1)} disabled={answerState !== 'waiting'}>▼</button>
+    </div>
+    <div class="clock-display">
       <div class="cur-digital" class:correct={answerState === 'correct'} class:wrong={answerState === 'wrong'}>
-        {toDigital({ hours: curH, minutes: curM })}
+        {curDH}:{String(curDM).padStart(2, '0')}
       </div>
-    {:else}
-      <div class="cur-text" class:correct={answerState === 'correct'} class:wrong={answerState === 'wrong'}>
-        {toText({ hours: curH, minutes: curM })}
-      </div>
-    {/if}
-  </div>
+    </div>
+    <div class="adj-col">
+      <button class="adj-btn" onclick={() => adjDM(5)}  disabled={answerState !== 'waiting'}>▲</button>
+      <div class="adj-label">Minuutit</div>
+      <button class="adj-btn" onclick={() => adjDM(-5)} disabled={answerState !== 'waiting'}>▼</button>
+    </div>
 
-  <div class="adj-col">
-    <button class="adj-btn" onclick={() => adjM(5)} disabled={answerState !== 'waiting'}>▲</button>
-    <div class="adj-label">Minuutit</div>
-    <button class="adj-btn" onclick={() => adjM(-5)} disabled={answerState !== 'waiting'}>▼</button>
-  </div>
+  {:else}
+    <div class="adj-col">
+      <button class="adj-btn" onclick={() => adjH(1)}  disabled={answerState !== 'waiting'}>▲</button>
+      <div class="adj-label">Tunnit</div>
+      <button class="adj-btn" onclick={() => adjH(-1)} disabled={answerState !== 'waiting'}>▼</button>
+    </div>
+    <div class="clock-display">
+      {#if answerFmt === 'analog'}
+        <AnalogClock hours={curH} minutes={curM} size={clockSize} />
+      {:else if answerFmt === 'digital'}
+        <div class="cur-digital" class:correct={answerState === 'correct'} class:wrong={answerState === 'wrong'}>
+          {toDigital({ hours: curH, minutes: curM })}
+        </div>
+      {:else}
+        <div class="cur-text" class:correct={answerState === 'correct'} class:wrong={answerState === 'wrong'}>
+          {toText({ hours: curH, minutes: curM })}
+        </div>
+      {/if}
+    </div>
+    <div class="adj-col">
+      <button class="adj-btn" onclick={() => adjM(5)}  disabled={answerState !== 'waiting'}>▲</button>
+      <div class="adj-label">Minuutit</div>
+      <button class="adj-btn" onclick={() => adjM(-5)} disabled={answerState !== 'waiting'}>▼</button>
+    </div>
+  {/if}
 </div>
 
 {#if answerState === 'waiting'}
@@ -107,7 +166,14 @@
 {:else if answerState === 'wrong'}
   <div class="feedback-wrong">
     <span class="feedback-icon">😅</span>
-    Ei ihan… Oikea aika on <strong>{toDigital(exercise.targetTime)}</strong>
+    {#if exercise.variant === 'difference'}
+      Ei ihan… Oikea kesto on <strong>{formatDuration(exercise.correctMinutes)}</strong>
+    {:else if exercise.variant === 'addition'}
+      {@const t = exercise.baseTime.hours * 60 + exercise.baseTime.minutes + exercise.delta}
+      Ei ihan… Oikea aika on <strong>{toDigital({ hours: Math.floor(t / 60), minutes: t % 60 })}</strong>
+    {:else}
+      Ei ihan… Oikea aika on <strong>{toDigital(exercise.targetTime)}</strong>
+    {/if}
     <button class="next-btn" onclick={onNext}>Seuraava →</button>
   </div>
 {/if}
@@ -148,6 +214,7 @@
     letter-spacing: 2px;
     line-height: 1;
   }
+  .target-digital.small { font-size: clamp(2rem, 5dvh, 3rem); }
   .target-text {
     font-size: clamp(1.6rem, 4dvh, 2.2rem);
     font-weight: 900;
@@ -155,6 +222,22 @@
     text-align: center;
     white-space: pre-line;
     line-height: 1.25;
+  }
+
+  /* Difference question */
+  .two-times { display: flex; align-items: center; gap: 12px; }
+  .time-item  { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .time-small-label { font-size: 0.85rem; font-weight: 700; color: #8d6e63; }
+  .time-arrow { font-size: 2rem; color: #8d6e63; }
+
+  /* Addition delta badge */
+  .delta-badge {
+    font-size: clamp(1.4rem, 3.5dvh, 2rem);
+    font-weight: 900;
+    padding: 8px 20px;
+    border-radius: 16px;
+    background: #fff3e0;
+    color: #e65100;
   }
 
   .adjuster {
@@ -247,7 +330,6 @@
   .submit-btn:hover  { transform: translateY(-3px); box-shadow: 0 10px 26px rgba(0,0,0,0.28); }
   .submit-btn:active { transform: scale(0.96); }
 
-  /* shared with Exercise.svelte */
   .feedback-wrong {
     display: flex;
     align-items: center;
