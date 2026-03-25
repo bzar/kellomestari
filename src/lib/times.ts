@@ -36,6 +36,7 @@ export interface MestariExercise {
   type: 'mestari';
   targetTime: ClockTime;
   targetFormat: Format;
+  answerFormat: Format;
 }
 
 export type Exercise =
@@ -223,10 +224,12 @@ export function generateExercises(difficulty: Difficulty, count = 10): Exercise[
   const pool = getPool(difficulty);
 
   if (difficulty === 'mestari') {
+    const allFormats: Format[] = ['analog', 'digital', 'text'];
     return shuffle(pool).slice(0, count).map(time => {
-      const fmts = validFormats(time);
-      const targetFormat = fmts[Math.floor(Math.random() * fmts.length)];
-      return { type: 'mestari', targetTime: time, targetFormat } satisfies MestariExercise;
+      const targetFormat = allFormats[Math.floor(Math.random() * 3)];
+      const rest = allFormats.filter(f => f !== targetFormat);
+      const answerFormat = rest[Math.floor(Math.random() * rest.length)];
+      return { type: 'mestari', targetTime: time, targetFormat, answerFormat } satisfies MestariExercise;
     });
   }
 

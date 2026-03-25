@@ -1,6 +1,6 @@
 <script lang="ts">
   import AnalogClock from './AnalogClock.svelte';
-  import { toText, toDigital, timesEqual, type MestariExercise } from './times.js';
+  import { toText, toDigital, type MestariExercise } from './times.js';
 
   interface Props {
     exercise: MestariExercise;
@@ -9,8 +9,13 @@
   }
   let { exercise, onAnswer, onNext }: Props = $props();
 
-  const maxHours = exercise.targetTime.hours > 12 ? 24 : 12;
-  let curH = $state(6);
+  // Analog and text both use 12h form – allow either 12h or 24h interpretation.
+  const uses12h = (f: typeof exercise.answerFormat) => f === 'analog' || f === 'text';
+  const maxHours = uses12h(exercise.answerFormat) ? 12 : 24;
+
+  // Start away from the answer so the player has to actively adjust.
+  const startH = (exercise.targetTime.hours % 12 || 12) === 12 ? 6 : 12;
+  let curH = $state(startH);
   let curM = $state(0);
 
   type AnswerState = 'waiting' | 'correct' | 'wrong';
@@ -28,10 +33,18 @@
     curM = ((curM + d) + 60) % 60;
   }
 
+  function isCorrect(): boolean {
+    if (curM !== exercise.targetTime.minutes) return false;
+    // If either format is 12h-based (analog or text), accept both 12h interpretations.
+    const h12 = (h: number) => h % 12 || 12;
+    if (uses12h(exercise.targetFormat) || uses12h(exercise.answerFormat))
+      return h12(curH) === h12(exercise.targetTime.hours);
+    return curH === exercise.targetTime.hours;
+  }
+
   function submit() {
     if (answerState !== 'waiting') return;
-    const cur = { hours: curH, minutes: curM };
-    const ok = timesEqual(cur, exercise.targetTime);
+    const ok = isCorrect();
     onAnswer(ok);
     answerState = ok ? 'correct' : 'wrong';
     if (ok) timeoutId = setTimeout(onNext, 1600);
@@ -60,7 +73,7 @@
   {/if}
 </div>
 
-<!-- Adjustable clock -->
+<!-- Adjustable display -->
 <div class="adjuster">
   <div class="adj-col">
     <button class="adj-btn" onclick={() => adjH(1)} disabled={answerState !== 'waiting'}>▲</button>
@@ -69,10 +82,17 @@
   </div>
 
   <div class="clock-display">
-    <AnalogClock hours={curH} minutes={curM} size={clockSize} />
-    <div class="cur-digital" class:correct={answerState === 'correct'} class:wrong={answerState === 'wrong'}>
-      {toDigital({ hours: curH, minutes: curM })}
-    </div>
+    {#if exercise.answerFormat === 'analog'}
+      <AnalogClock hours={curH} minutes={curM} size={clockSize} />
+    {:else if exercise.answerFormat === 'digital'}
+      <div class="cur-digital" class:correct={answerState === 'correct'} class:wrong={answerState === 'wrong'}>
+        {toDigital({ hours: curH, minutes: curM })}
+      </div>
+    {:else}
+      <div class="cur-text" class:correct={answerState === 'correct'} class:wrong={answerState === 'wrong'}>
+        {toText({ hours: curH, minutes: curM })}
+      </div>
+    {/if}
   </div>
 
   <div class="adj-col">
@@ -193,8 +213,20 @@
     letter-spacing: 1px;
     transition: background 0.3s;
   }
-  .cur-digital.correct { background: #c8e6c9; color: #1b5e20; }
-  .cur-digital.wrong   { background: #ffcdd2; color: #b71c1c; }
+  .cur-text {
+    font-size: clamp(1rem, 2.6dvh, 1.35rem);
+    font-weight: 900;
+    color: #4a148c;
+    background: #f3e5f5;
+    border-radius: 12px;
+    padding: 8px 14px;
+    text-align: center;
+    white-space: pre-line;
+    line-height: 1.3;
+    transition: background 0.3s;
+  }
+  .cur-digital.correct, .cur-text.correct { background: #c8e6c9; color: #1b5e20; }
+  .cur-digital.wrong,   .cur-text.wrong   { background: #ffcdd2; color: #b71c1c; }
 
   .submit-btn {
     padding: clamp(12px, 1.8dvh, 18px) 40px;
