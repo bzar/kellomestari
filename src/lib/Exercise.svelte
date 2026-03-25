@@ -21,12 +21,25 @@
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
   $effect(() => () => { if (timeoutId) clearTimeout(timeoutId); });
 
+  // When a 12h-based format (analog or text) is involved, both the 12h and
+  // 24h variants of the same time are visually identical → accept either.
+  function isCorrectChoice(idx: number): boolean {
+    if (idx === exercise.correctIndex) return true;
+    if (exercise.type !== 'conversion') return false;
+    const { questionFormat: qf, answerFormat: af, choices, correctIndex } = exercise;
+    if (qf === 'digital' && af === 'digital') return false;
+    const correct = choices[correctIndex] as ClockTime;
+    const choice  = choices[idx]          as ClockTime;
+    const h12 = (h: number) => h % 12 || 12;
+    return h12(choice.hours) === h12(correct.hours) && choice.minutes === correct.minutes;
+  }
+
   function choose(idx: number) {
     if (answerState !== 'waiting') return;
     chosenIdx = idx;
-    const isCorrect = idx === exercise.correctIndex;
-    onAnswer(isCorrect);
-    if (isCorrect) {
+    const correct = isCorrectChoice(idx);
+    onAnswer(correct);
+    if (correct) {
       answerState = 'correct';
       timeoutId = setTimeout(onNext, 1600);
     } else {
@@ -36,8 +49,8 @@
 
   function btnClass(idx: number): string {
     if (answerState === 'waiting') return 'choice-btn';
-    if (idx === exercise.correctIndex) return 'choice-btn reveal-correct';
-    if (idx === chosenIdx)             return 'choice-btn wrong-chosen';
+    if (isCorrectChoice(idx))  return 'choice-btn reveal-correct';
+    if (idx === chosenIdx)     return 'choice-btn wrong-chosen';
     return 'choice-btn dimmed';
   }
 
