@@ -24,19 +24,17 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: kellomestari/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: kellomestari
         run: npm ci
 
       - name: Build
-        working-directory: kellomestari
         run: npm run build
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: kellomestari/dist
+          path: dist
 
   deploy:
     needs: build
