@@ -163,7 +163,7 @@
     gap: 16px;
     width: 100%;
     max-width: 360px;
-    justify-content: center;
+    justify-content: space-between;
   }
   .adj-col {
     display: flex;
@@ -198,10 +198,13 @@
     text-align: center;
   }
   .clock-display {
+    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 6px;
+    min-width: 0;
   }
   .cur-digital {
     font-size: 1.8rem;
