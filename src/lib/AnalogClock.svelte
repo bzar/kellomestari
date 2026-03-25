@@ -23,7 +23,7 @@
   const cardinals = $derived([[12, 0], [3, 90], [6, 180], [9, 270]] as [number, number][]);
 </script>
 
-<svg width={size} height={size} viewBox="0 0 {size} {size}" style="display:block;flex-shrink:0">
+<svg width={size} height={size} viewBox="0 0 {size} {size}" style="display:block;flex-shrink:0;max-width:100%;max-height:100%">
   <!-- Face -->
   <circle cx={c} cy={c} r={r} fill="#fffde7" stroke="#f9a825" stroke-width="3" />
 

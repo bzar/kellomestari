@@ -1,6 +1,12 @@
 <script lang="ts">
-  import { generateExercises, type Exercise } from './lib/times.js';
+  import {
+    generateExercises,
+    type Exercise, type Difficulty,
+    type ConversionExercise, type DifferenceExercise, type AdditionExercise,
+    type MestariExercise,
+  } from './lib/times.js';
   import ExerciseView from './lib/Exercise.svelte';
+  import MestariView  from './lib/MestariExercise.svelte';
 
   type Screen = 'start' | 'playing' | 'finished';
 
@@ -8,9 +14,11 @@
   let exercises   = $state<Exercise[]>([]);
   let currentIdx  = $state(0);
   let score       = $state(0);
+  let difficulty  = $state<Difficulty>('aloittelija');
 
-  function start() {
-    exercises  = generateExercises(10);
+  function start(diff: Difficulty) {
+    difficulty = diff;
+    exercises  = generateExercises(diff, 10);
     currentIdx = 0;
     score      = 0;
     screen     = 'playing';
@@ -43,6 +51,20 @@
     if (s >= 4)   return 'Hyvää yritystä! Kokeile uudelleen!';
     return 'Harjoittele lisää – siitä se opitaan!';
   }
+
+  const LEVELS: { id: Difficulty; emoji: string; name: string; desc: string }[] = [
+    { id: 'aloittelija', emoji: '🌱', name: 'Aloittelija', desc: 'Tunnit 1–12, tasaminuutit' },
+    { id: 'oppilas',     emoji: '📚', name: 'Oppilas',     desc: 'Tunnit 1–24, haastavampi' },
+    { id: 'kisalli',     emoji: '⚡', name: 'Kisälli',     desc: '5 min välein, aikavälit' },
+    { id: 'mestari',     emoji: '🏆', name: 'Mestari',     desc: 'Aseta kello itse' },
+  ];
+
+  function isMestari(ex: Exercise): ex is MestariExercise {
+    return ex.type === 'mestari';
+  }
+  function isMulti(ex: Exercise): ex is ConversionExercise | DifferenceExercise | AdditionExercise {
+    return ex.type !== 'mestari';
+  }
 </script>
 
 <!-- ── Start screen ───────────────────────────────────────── -->
@@ -51,8 +73,16 @@
     <div class="title-emoji">⏰</div>
     <h1>Kellomestari</h1>
     <p class="subtitle">Opitaan lukemaan kelloa!</p>
-    <p class="subtitle small">10 tehtävää odottaa sinua.</p>
-    <button class="big-btn" onclick={start}>Aloita peli! 🎮</button>
+    <p class="level-prompt">Valitse taso:</p>
+    <div class="level-grid">
+      {#each LEVELS as lvl}
+        <button class="level-btn" onclick={() => start(lvl.id)}>
+          <span class="level-emoji">{lvl.emoji}</span>
+          <span class="level-name">{lvl.name}</span>
+          <span class="level-desc">{lvl.desc}</span>
+        </button>
+      {/each}
+    </div>
   </div>
 
 <!-- ── Game screen ────────────────────────────────────────── -->
@@ -74,11 +104,19 @@
     <div class="question-label">Tehtävä {currentIdx + 1} / {exercises.length}</div>
 
     {#key currentIdx}
-      <ExerciseView
-        exercise={exercises[currentIdx]}
-        onAnswer={handleAnswer}
-        onNext={handleNext}
-      />
+      {#if isMestari(exercises[currentIdx])}
+        <MestariView
+          exercise={exercises[currentIdx] as MestariExercise}
+          onAnswer={handleAnswer}
+          onNext={handleNext}
+        />
+      {:else}
+        <ExerciseView
+          exercise={exercises[currentIdx] as ConversionExercise | DifferenceExercise | AdditionExercise}
+          onAnswer={handleAnswer}
+          onNext={handleNext}
+        />
+      {/if}
     {/key}
   </div>
 
@@ -89,47 +127,83 @@
     <h2>Peli ohi!</h2>
     <div class="score-display">{score} / 10</div>
     <p class="score-msg">{scoreMessage(score)}</p>
-    <button class="big-btn" onclick={start}>Pelaa uudelleen! 🔄</button>
+    <button class="big-btn" onclick={() => (screen = 'start')}>Pelaa uudelleen! 🔄</button>
   </div>
 {/if}
 
 <style>
-  /* ── Shared layout ───────────────────────────────────────── */
+  /* ── Shared ──────────────────────────────────────────────── */
   .screen {
-    min-height: 100dvh;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 24px 16px;
-    gap: 20px;
+    padding: clamp(12px, 2dvh, 24px) 16px;
+    gap: clamp(10px, 1.8dvh, 20px);
+    overflow: hidden;
   }
 
   /* ── Start screen ────────────────────────────────────────── */
-  .start-screen { gap: 12px; }
+  .start-screen { gap: clamp(8px, 1.4dvh, 14px); }
   .title-emoji {
-    font-size: 5rem;
+    font-size: clamp(3rem, 8dvh, 5rem);
     animation: wobble 2s ease-in-out infinite;
   }
   h1 {
-    font-size: 3.2rem;
+    font-size: clamp(2.2rem, 6dvh, 3.2rem);
     font-weight: 900;
     color: #d84315;
     text-shadow: 2px 2px 0 #ff8f00;
     margin: 0;
   }
   .subtitle {
-    font-size: 1.4rem;
+    font-size: clamp(1.1rem, 2.8dvh, 1.4rem);
     font-weight: 700;
     color: #5d4037;
     text-align: center;
     margin: 0;
   }
-  .subtitle.small { font-size: 1.1rem; color: #795548; }
+  .level-prompt {
+    font-size: clamp(0.9rem, 2dvh, 1.1rem);
+    font-weight: 700;
+    color: #795548;
+    margin: 0;
+  }
+  .level-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(8px, 1.4dvh, 12px);
+    width: 100%;
+    max-width: 360px;
+  }
+  .level-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: clamp(10px, 1.8dvh, 16px) 12px;
+    border-radius: 18px;
+    border: none;
+    background: #ef6c00;
+    color: white;
+    font-family: inherit;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .level-btn:hover  { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.26); }
+  .level-btn:active { transform: scale(0.96); }
+  .level-emoji { font-size: clamp(1.6rem, 4dvh, 2.2rem); }
+  .level-name  { font-size: clamp(1rem, 2.5dvh, 1.2rem); font-weight: 900; }
+  .level-desc  { font-size: clamp(0.65rem, 1.5dvh, 0.8rem); font-weight: 600; text-align: center; opacity: 0.9; }
 
   /* ── Game screen ─────────────────────────────────────────── */
-  .game-screen { justify-content: flex-start; padding-top: 16px; gap: 16px; }
-
+  .game-screen {
+    justify-content: flex-start;
+    padding-top: clamp(10px, 1.5dvh, 16px);
+    gap: clamp(8px, 1.4dvh, 16px);
+  }
   .top-bar {
     display: flex;
     align-items: center;
@@ -137,11 +211,7 @@
     width: 100%;
     max-width: 360px;
   }
-  .progress-dots {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-  }
+  .progress-dots { display: flex; gap: 6px; align-items: center; }
   .dot {
     width: 12px;
     height: 12px;
@@ -151,7 +221,6 @@
   }
   .dot.done   { background: #66bb6a; }
   .dot.active { background: #ffa726; transform: scale(1.4); }
-
   .score-badge {
     font-size: 1.3rem;
     font-weight: 900;
@@ -162,27 +231,27 @@
     box-shadow: 0 2px 6px rgba(0,0,0,0.15);
   }
   .question-label {
-    font-size: 1rem;
+    font-size: clamp(0.85rem, 1.8dvh, 1rem);
     font-weight: 700;
     color: #8d6e63;
     text-align: center;
   }
 
-  /* ── Results screen ──────────────────────────────────────── */
-  .finish-screen { gap: 16px; }
-  .result-emoji  { font-size: 7rem; animation: bigBounce 0.7s cubic-bezier(0.68,-0.55,0.27,1.55); }
-  h2 { font-size: 2.4rem; font-weight: 900; color: #d84315; margin: 0; }
+  /* ── Results screen ──────────────────────────────────────────────────── */
+  .finish-screen { gap: clamp(10px, 1.8dvh, 16px); }
+  .result-emoji  { font-size: clamp(4rem, 10dvh, 7rem); animation: bigBounce 0.7s cubic-bezier(0.68,-0.55,0.27,1.55); }
+  h2 { font-size: clamp(1.8rem, 5dvh, 2.4rem); font-weight: 900; color: #d84315; margin: 0; }
   .score-display {
-    font-size: 4.5rem;
+    font-size: clamp(3rem, 8dvh, 4.5rem);
     font-weight: 900;
     color: #1565c0;
     background: white;
     border-radius: 24px;
-    padding: 16px 40px;
+    padding: clamp(12px, 2dvh, 16px) 40px;
     box-shadow: 0 4px 16px rgba(0,0,0,0.14);
   }
   .score-msg {
-    font-size: 1.4rem;
+    font-size: clamp(1.1rem, 2.8dvh, 1.4rem);
     font-weight: 700;
     color: #4e342e;
     text-align: center;
@@ -190,10 +259,10 @@
     margin: 0;
   }
 
-  /* ── Shared button ───────────────────────────────────────── */
+  /* ── Shared button ───────────────────────────────────────────────────── */
   .big-btn {
-    padding: 18px 44px;
-    font-size: 1.5rem;
+    padding: clamp(14px, 2.5dvh, 18px) 44px;
+    font-size: clamp(1.2rem, 3dvh, 1.5rem);
     font-weight: 900;
     font-family: inherit;
     border-radius: 20px;
@@ -207,7 +276,6 @@
   .big-btn:hover  { transform: translateY(-3px); box-shadow: 0 10px 26px rgba(0,0,0,0.28); }
   .big-btn:active { transform: scale(0.96); }
 
-  /* ── Keyframes ───────────────────────────────────────────── */
   @keyframes wobble {
     0%,100% { transform: rotate(-8deg) scale(1); }
     50%     { transform: rotate(8deg)  scale(1.05); }

@@ -2,6 +2,7 @@
 
 html, body {
   height: 100%;
+  overflow: hidden;
   font-family: 'Nunito', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-tap-highlight-color: transparent;
 }
