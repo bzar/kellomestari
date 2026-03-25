@@ -133,7 +133,7 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 function getPool(difficulty: Difficulty): ClockTime[] {
-  const maxH = difficulty === 'aloittelija' ? 12 : 24;
+  const maxH = difficulty === 'aloittelija' ? 12 : 23;
   const mins = (difficulty === 'aloittelija' || difficulty === 'oppilas')
     ? [0, 15, 30, 45]
     : [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
