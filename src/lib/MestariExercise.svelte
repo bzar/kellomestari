@@ -345,6 +345,19 @@
     max-width: 360px;
     flex-wrap: wrap;
   }
+  @media (max-height: 900px) {
+    .feedback-wrong {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      max-width: none;
+      border-radius: 16px 16px 0 0;
+      border-bottom: none;
+      z-index: 50;
+      box-shadow: 0 -4px 16px rgba(0,0,0,0.15);
+    }
+  }
   .feedback-icon { font-size: 1.6rem; }
   .next-btn {
     margin-left: auto;
